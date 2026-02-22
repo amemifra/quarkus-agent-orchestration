@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: io.quarkiverse.agent.it.AgentExtensionTest
--------------------------------------------------------------------------------
-Tests run: 57, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.696 s -- in io.quarkiverse.agent.it.AgentExtensionTest
