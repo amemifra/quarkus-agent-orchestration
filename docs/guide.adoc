@@ -1,0 +1,587 @@
+= Quarkus Agent Extension
+:extension-status: experimental
+:toc: left
+:toclevels: 3
+:sectnums:
+:keywords: quarkus, extension, ai, agent, llm, orchestration
+
+[[overview]]
+== Overview
+
+The Quarkus Agent Extension provides a single CDI-injectable service -- `AgentOrchestrationService` -- that exposes **14 AI agent orchestration architectures** as simple method calls, with **21 LLM providers** and **quality-tier routing**. It follows the Quarkus build-time augmentation model for fast startup and low memory footprint.
+
+=== Key Capabilities
+
+* 14 agent architectures from single-agent (ReAct, Reflection) to multi-agent (Crew, Supervisor, Swarm)
+* 21 LLM providers: OpenAI-compatible (18) + Anthropic Claude + Google Gemini + Cohere
+* Quality-tier routing: classify tasks as HIGH/MEDIUM/LOW and route to appropriate provider
+* Declarative agent definitions via annotations with quality tier attribute
+* Provider-agnostic LLM integration with dedicated clients for non-OpenAI APIs
+* Isolated tool execution in ephemeral Docker containers
+* Zero runtime reflection (Jandex-powered annotation scanning)
+
+[[getting-started]]
+== Getting Started
+
+=== Prerequisites
+
+* Java 21+
+* Maven 3.9+
+* Docker (for tool execution sandbox)
+* An OpenAI-compatible LLM API (e.g., https://ollama.com[Ollama])
+
+=== Installation
+
+Add the extension to your project's `pom.xml`:
+
+[source,xml]
+----
+<dependency>
+    <groupId>io.quarkiverse.agent</groupId>
+    <artifactId>quarkus-agent-extension</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+----
+
+=== Configuration
+
+Configure the LLM provider in `application.properties`:
+
+[source,properties]
+----
+# Base URL of the OpenAI-compatible API
+quarkus.agent.base-url=http://localhost:11434
+----
+
+[[programmatic-api]]
+== Programmatic API
+
+Inject the `AgentOrchestrationService` and call the desired architecture method:
+
+[source,java]
+----
+@Inject
+AgentOrchestrationService agents;
+
+public AgentResult runExample() {
+    var config = AgentConfig.builder()
+        .model("llama3")
+        .temperature(0.7)
+        .maxIterations(5)
+        .systemPrompt("You are a helpful assistant.")
+        .build();
+
+    return agents.reflect(config, "Write a haiku about cloud computing");
+}
+----
+
+=== AgentConfig Builder
+
+The `AgentConfig` class uses the Builder pattern to configure agent behavior:
+
+[cols="1,1,3"]
+|===
+| Parameter | Default | Description
+
+| `model`
+| _(required)_
+| LLM model name (e.g., `llama3`, `gpt-4`)
+
+| `temperature`
+| `0.7`
+| Sampling temperature (0.0 = deterministic, 1.0 = creative)
+
+| `maxIterations`
+| `10`
+| Maximum number of iterations for iterative architectures
+
+| `systemPrompt`
+| `""`
+| System prompt prepended to all LLM calls
+
+| `tools`
+| `[]`
+| List of `Tool` objects available to tool-using architectures
+|===
+
+=== AgentResult
+
+Every architecture method returns an `AgentResult` record:
+
+[source,java]
+----
+public record AgentResult(
+    String content,        // Final output
+    List<Step> steps,      // Execution trace
+    int totalTokens,       // Token usage
+    long durationMs        // Execution time
+) { }
+----
+
+[[architectures]]
+== Architecture Catalog
+
+[[single-agent]]
+=== Single-Agent Architectures
+
+==== A1: ReAct (Reason + Act)
+
+The agent follows a Thought → Action → Observation loop.
+
+[source,java]
+----
+AgentResult result = agents.react(config, "What is the weather in Rome?");
+----
+
+==== A3: Reflection
+
+Generate → Critique → Refine iterative loop until the output is accepted.
+
+[source,java]
+----
+AgentResult result = agents.reflect(config, "Write a poem about Java");
+// Steps include: THOUGHT, CRITIQUE, REFINEMENT
+----
+
+==== A9: DAG Pipeline
+
+Sequential chain of processing steps, each transforming the previous output.
+
+[source,java]
+----
+var steps = List.of(
+    PipelineEngine.PipelineStep.of("summarize", "Summarize the text."),
+    PipelineEngine.PipelineStep.of("translate", "Translate to Italian.")
+);
+AgentResult result = agents.pipeline(config, steps, "Hello world");
+----
+
+==== A13: Tool-Use Agent
+
+The agent decides which tools to call and in what order.
+
+[source,java]
+----
+var config = AgentConfig.builder()
+    .model("llama3")
+    .addTool("calculator", "Performs math", input -> String.valueOf(eval(input)))
+    .build();
+AgentResult result = agents.toolUse(config, "What is 15 * 37?");
+----
+
+==== A14: Verification Loop
+
+A generator agent produces output, then a verifier agent checks for correctness.
+
+[source,java]
+----
+AgentResult result = agents.verify(config, "What is the capital of France?");
+----
+
+[[multi-agent]]
+=== Multi-Agent Architectures
+
+==== A2: Plan-and-Execute
+
+The agent generates a step-by-step plan, executes each step, and synthesizes results.
+
+[source,java]
+----
+AgentResult result = agents.planAndExecute(config, "Research and summarize AI trends");
+----
+
+==== A5: Supervisor
+
+A supervisor agent delegates tasks to specialized workers.
+
+[source,java]
+----
+var workers = List.of(
+    SupervisorEngine.WorkerDef.of("researcher", "Expert in data analysis"),
+    SupervisorEngine.WorkerDef.of("writer", "Technical documentation writer")
+);
+AgentResult result = agents.supervisor(config, workers, "Create a market report");
+----
+
+==== A6: Hierarchical
+
+Multi-level supervisor tree — top-level delegates to mid-level supervisors.
+
+[source,java]
+----
+var teams = List.of(
+    HierarchicalEngine.TeamDef.of("Research Team", researchWorkers),
+    HierarchicalEngine.TeamDef.of("Writing Team", writingWorkers)
+);
+AgentResult result = agents.hierarchical(config, teams, "Strategic analysis");
+----
+
+==== A7: Role-Based Crew
+
+Agents with defined roles (researcher, writer, reviewer) collaborate sequentially.
+
+[source,java]
+----
+var crew = List.of(
+    CrewEngine.CrewMember.of("Researcher", "Expert analyst", "Research the topic"),
+    CrewEngine.CrewMember.of("Writer", "Technical writer", "Write a report"),
+    CrewEngine.CrewMember.of("Reviewer", "QA expert", "Review the report")
+);
+AgentResult result = agents.crew(config, crew, "Cloud computing trends");
+----
+
+==== A8: Conversational Swarm
+
+Agents converse freely in natural language, reaching consensus emergently.
+
+[source,java]
+----
+var swarmAgents = List.of(
+    SwarmEngine.SwarmAgent.of("Alice", "Optimistic strategist"),
+    SwarmEngine.SwarmAgent.of("Bob", "Skeptical analyst"),
+    SwarmEngine.SwarmAgent.of("Carol", "Neutral mediator")
+);
+AgentResult result = agents.swarm(config, swarmAgents, "Should we invest in AI?");
+----
+
+==== A10: Handoff
+
+Agents pass control dynamically to each other without a central orchestrator.
+
+[source,java]
+----
+var handoffAgents = Map.of(
+    "triage", HandoffEngine.HandoffAgent.of("You classify user requests"),
+    "billing", HandoffEngine.HandoffAgent.of("You handle billing questions"),
+    "support", HandoffEngine.HandoffAgent.of("You handle technical support")
+);
+AgentResult result = agents.handoff(config, handoffAgents, "triage", "I need a refund");
+----
+
+==== A11: Map-Reduce
+
+Fan-out over multiple inputs (map), then aggregate results (reduce).
+
+[source,java]
+----
+var docs = List.of("Doc A content", "Doc B content", "Doc C content");
+AgentResult result = agents.mapReduce(config, docs,
+    "Summarize this document.",
+    "Synthesize all summaries into a final report.");
+----
+
+==== A12: Debate-Consensus
+
+N debaters generate independent positions, an arbiter synthesizes consensus.
+
+[source,java]
+----
+AgentResult result = agents.debate(config, 3, "Is Java better than Python?");
+----
+
+==== A4: State Graph
+
+Cyclic graph of nodes (functions) and edges (conditional/fixed), with persistent state.
+
+[source,java]
+----
+var graph = new StateGraphEngine.GraphDef(
+    "start",
+    List.of(
+        StateGraphEngine.NodeDef.of("start", "Analyze the input"),
+        StateGraphEngine.NodeDef.of("process", "Process the data"),
+        StateGraphEngine.NodeDef.of("output", "Generate final output")
+    ),
+    ctx -> ctx.iteration() > 2 ? "output" : "process"  // router
+);
+AgentResult result = agents.stateGraph(config, graph, "Input data");
+----
+
+[[declarative-api]]
+== Declarative API (Annotations)
+
+Define agents entirely with annotations — the extension discovers them at build time via Jandex.
+
+=== @Agent
+
+Declares a class as an AI agent:
+
+[source,java]
+----
+@Agent(
+    provider = "ollama",
+    model = "llama3",
+    architecture = Architecture.REFLECTION,
+    maxIterations = 3,
+    temperature = 0.5,
+    systemPrompt = "You are a creative writer.",
+    quality = InferenceQuality.HIGH
+)
+public class WriterAgent {
+
+    @Generate
+    public String write(@UserPrompt String topic) {
+        return "Write a creative poem about: " + topic;
+    }
+
+    @EvaluateOutput
+    public boolean isGoodEnough(String output) {
+        return output != null && output.length() > 50;
+    }
+}
+----
+
+=== @CrewMember (Repeatable)
+
+Defines crew members for `Architecture.CREW`:
+
+[source,java]
+----
+@Agent(model = "llama3", architecture = Architecture.CREW)
+@CrewMember(role = "Researcher", backstory = "Expert analyst", task = "Research the topic")
+@CrewMember(role = "Writer", backstory = "Technical writer", task = "Write a report")
+@CrewMember(role = "Reviewer", backstory = "QA specialist", task = "Review the output")
+public class ResearchCrew { }
+----
+
+=== @PipelineStep (Repeatable)
+
+Defines ordered steps for `Architecture.PIPELINE`:
+
+[source,java]
+----
+@Agent(model = "llama3", architecture = Architecture.PIPELINE)
+@PipelineStep(name = "summarize", systemPrompt = "Summarize.", order = 1)
+@PipelineStep(name = "translate", systemPrompt = "Translate to Italian.", order = 2)
+@PipelineStep(name = "format", systemPrompt = "Format as bullet points.", order = 3)
+public class TranslationPipeline { }
+----
+
+=== @DebateAgent (Repeatable)
+
+Defines debaters for `Architecture.DEBATE`:
+
+[source,java]
+----
+@Agent(model = "llama3", architecture = Architecture.DEBATE)
+@DebateAgent(name = "Optimist", personality = "Always sees the bright side")
+@DebateAgent(name = "Skeptic", personality = "Questions every assumption")
+@DebateAgent(name = "Realist", personality = "Seeks practical solutions")
+public class StrategyDebate { }
+----
+
+=== Accessing Discovered Agents
+
+Inject the `AgentRegistry` to access all build-time discovered agent definitions:
+
+[source,java]
+----
+@Inject
+AgentRegistry registry;
+
+public void listAgents() {
+    registry.getAgents().forEach(agent ->
+        System.out.println(agent.className() + " -> " + agent.architecture())
+    );
+}
+----
+
+[[tool-execution]]
+== Tool Execution Sandbox
+
+The extension provides isolated tool execution via Docker containers:
+
+[source,java]
+----
+@Inject
+ToolExecutor executor;
+
+public ToolResult runPythonScript(String script) {
+    var request = ToolRequest.builder()
+        .image("python:3.12-slim")
+        .command("python", "-c", script)
+        .timeout(Duration.ofSeconds(30))
+        .environment("PYTHONUNBUFFERED", "1")
+        .build();
+
+    return executor.execute(request);
+    // result.isSuccess(), result.stdout(), result.stderr()
+}
+----
+
+[[extension-points]]
+== Extension Points
+
+=== Custom LLM Provider
+
+Implement the `LlmClient` SPI and register as a CDI bean:
+
+[source,java]
+----
+@ApplicationScoped
+@Alternative
+@Priority(1)
+public class MyCustomLlmClient implements LlmClient {
+    @Override
+    public Uni<ChatResponse> chat(ChatRequest request) {
+        // Your custom implementation
+    }
+}
+----
+
+=== Custom Tool Executor
+
+Implement the `ToolExecutor` SPI:
+
+[source,java]
+----
+@ApplicationScoped
+@Alternative
+@Priority(1)
+public class KubernetesToolExecutor implements ToolExecutor {
+    @Override
+    public ToolResult execute(ToolRequest request) {
+        // Execute in Kubernetes pods instead of Docker
+    }
+}
+----
+
+[[configuration-reference]]
+== Configuration Reference
+
+include::config-reference.adoc[leveloffset=+1]
+
+[[testing]]
+== Testing
+
+=== Using FakeLlmClient
+
+For unit and integration tests, create a `FakeLlmClient` that overrides the real client:
+
+[source,java]
+----
+@Alternative
+@Priority(1)
+@ApplicationScoped
+public class FakeLlmClient implements LlmClient {
+    @Override
+    public Uni<ChatResponse> chat(ChatRequest request) {
+        var msg = ChatMessage.assistant("Fake response");
+        var choice = new ChatResponse.Choice(0, msg, "stop");
+        var usage = new ChatResponse.Usage(10, 5, 15);
+        return Uni.createFrom().item(
+            new ChatResponse("fake", request.model(), List.of(choice), usage)
+        );
+    }
+}
+----
+
+=== Live Ollama Testing
+
+Use a `QuarkusTestProfile` to test against a real Ollama instance:
+
+[source,java]
+----
+@QuarkusTest
+@TestProfile(OllamaTestProfile.class)
+@Tag("ollama")
+class OllamaLiveTest {
+    @Inject AgentOrchestrationService agents;
+
+    @Test void reflectWithRealLlm() {
+        var config = AgentConfig.builder().model("tinyllama").maxIterations(2).build();
+        AgentResult result = agents.reflect(config, "Write a haiku.");
+        assertFalse(result.content().isBlank());
+    }
+}
+----
+
+Run with: `mvn test -pl integration-tests -Dgroups=ollama`
+
+[[multi-provider]]
+== Multi-Provider Support
+
+The extension supports 21 LLM providers across 4 API families:
+
+[cols="1,3,2"]
+|===
+| Family | Providers | Strategy
+
+| **OpenAI-compatible**
+| OpenAI, Ollama, DeepSeek, Mistral, Groq, Together, Fireworks, Perplexity, DeepInfra, OpenRouter, vLLM, LM Studio, LocalAI, HuggingFace, Replicate, SambaNova, Cerebras, Anyscale
+| Same `OpenAiLlmClient`, different `base-url`
+
+| **Anthropic Claude**
+| Claude API, AWS Bedrock, GCP Vertex AI
+| Dedicated `AnthropicLlmClient` (`/v1/messages`)
+
+| **Google Gemini**
+| Google AI, Vertex AI
+| Dedicated `GeminiLlmClient` (`/v1beta/models`)
+
+| **Cohere**
+| Command
+| Dedicated `CohereLlmClient` (`/v2/chat`)
+|===
+
+Use `LlmClientFactory` to create provider-specific clients:
+
+[source,java]
+----
+@Inject LlmClientFactory factory;
+
+LlmClient deepseek = factory.create(LlmProvider.DEEPSEEK, "sk-xxx");
+LlmClient claude = factory.create(LlmProvider.ANTHROPIC, "sk-ant-xxx");
+LlmClient gemini = factory.create(LlmProvider.GOOGLE, "AIza-xxx");
+----
+
+[[quality-routing]]
+== Quality-Tier Routing
+
+The `InferenceRouter` classifies tasks into quality tiers and routes to the appropriate provider:
+
+[source,java]
+----
+@Inject InferenceRouter router;
+
+// Configure provider tiers
+router.configure(InferenceRoute.of(InferenceQuality.HIGH, LlmProvider.ANTHROPIC, "claude-sonnet-4", "sk-ant-xxx"));
+router.configure(InferenceRoute.of(InferenceQuality.MEDIUM, LlmProvider.OLLAMA, "llama3"));
+router.configure(InferenceRoute.of(InferenceQuality.LOW, LlmProvider.GROQ, "mixtral-8x7b", "gsk-xxx"));
+
+// Manual classification
+InferenceQuality tier = router.classify("Analyze complex legal contract..."); // → HIGH
+
+// Auto-route: classify + get client
+LlmClient client = router.autoRoute("Analyze complex legal contract..."); // → Anthropic
+LlmClient fast = router.autoRoute("Say hello"); // → Groq
+----
+
+=== Classification Rules
+
+[cols="1,3"]
+|===
+| Tier | Criteria
+
+| **HIGH**
+| Contains keywords: analyze, research, compare, synthesize, complex, detailed, comprehensive, legal, medical, scientific, architect; OR > 100 words
+
+| **MEDIUM**
+| 31-100 words without HIGH keywords
+
+| **LOW**
+| ≤ 30 words, no HIGH keywords, or blank prompt
+|===
+
+=== Declarative Quality
+
+Set quality tier directly on `@Agent` annotations:
+
+[source,java]
+----
+@Agent(model = "llama3", architecture = Architecture.REFLECTION, quality = InferenceQuality.HIGH)
+public class CriticalAgent { /* ... */ }
+
+@Agent(model = "tinyllama", architecture = Architecture.PIPELINE, quality = InferenceQuality.LOW)
+public class FastPipeline { /* ... */ }
+----

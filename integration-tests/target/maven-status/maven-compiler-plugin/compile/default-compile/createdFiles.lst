@@ -1,0 +1,12 @@
+io/quarkiverse/agent/it/AnnotatedReActAgent.class
+io/quarkiverse/agent/it/AnnotatedHierarchicalAgent.class
+io/quarkiverse/agent/it/AgentResource.class
+io/quarkiverse/agent/it/AnnotatedGraphAgent.class
+io/quarkiverse/agent/it/AnnotatedWriterAgent.class
+io/quarkiverse/agent/it/FakeLlmClient.class
+io/quarkiverse/agent/it/AnnotatedSupervisorAgent.class
+io/quarkiverse/agent/it/AnnotatedSwarmAgent.class
+io/quarkiverse/agent/it/AnnotatedHandoffAgent.class
+io/quarkiverse/agent/it/AnnotatedCrewAgent.class
+io/quarkiverse/agent/it/AnnotatedPipelineAgent.class
+io/quarkiverse/agent/it/AnnotatedMapReduceAgent.class

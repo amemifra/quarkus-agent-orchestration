@@ -1,0 +1,195 @@
+= Configuration Reference
+:toc:
+
+== Runtime Configuration
+
+The following configuration properties are available at runtime:
+
+[cols="3,1,1,3"]
+|===
+| Property | Type | Default | Description
+
+| `quarkus.agent.base-url`
+| `string`
+| `http://localhost:11434`
+| Base URL of the OpenAI-compatible LLM API. Supports Ollama, OpenAI, vLLM, and any compatible endpoint.
+|===
+
+== Annotation Attributes
+
+=== @Agent
+
+[cols="2,1,1,3"]
+|===
+| Attribute | Type | Default | Description
+
+| `provider`
+| `String`
+| `"ollama"`
+| LLM provider identifier
+
+| `model`
+| `String`
+| _(required)_
+| Model name (e.g., `llama3`, `gpt-4`, `tinyllama`)
+
+| `architecture`
+| `Architecture`
+| _(required)_
+| Agent architecture enum value
+
+| `maxIterations`
+| `int`
+| `10`
+| Max iterations for iterative architectures
+
+| `temperature`
+| `double`
+| `0.7`
+| LLM sampling temperature
+
+| `systemPrompt`
+| `String`
+| `""`
+| System prompt prepended to LLM calls
+
+| `quality`
+| `InferenceQuality`
+| `MEDIUM`
+| Inference quality tier (HIGH, MEDIUM, LOW) for routing
+|===
+
+=== @CrewMember
+
+[cols="2,1,1,3"]
+|===
+| Attribute | Type | Default | Description
+
+| `role`
+| `String`
+| _(required)_
+| Agent role name
+
+| `backstory`
+| `String`
+| `""`
+| Agent background description
+
+| `task`
+| `String`
+| _(required)_
+| Task assignment for this agent
+|===
+
+=== @PipelineStep
+
+[cols="2,1,1,3"]
+|===
+| Attribute | Type | Default | Description
+
+| `name`
+| `String`
+| _(required)_
+| Step identifier
+
+| `systemPrompt`
+| `String`
+| _(required)_
+| System prompt for this processing step
+
+| `order`
+| `int`
+| `0`
+| Execution order (ascending)
+|===
+
+=== @DebateAgent
+
+[cols="2,1,1,3"]
+|===
+| Attribute | Type | Default | Description
+
+| `name`
+| `String`
+| _(required)_
+| Debater name
+
+| `personality`
+| `String`
+| `""`
+| Personality description for the debater
+|===
+
+=== @Generate
+
+Method-level. Marks the method that generates the initial prompt. Receives `@UserPrompt` parameter.
+
+=== @EvaluateOutput
+
+Method-level. Marks the method that evaluates output quality. Must return `boolean`.
+
+=== @UserPrompt
+
+Parameter-level. Marks the parameter that receives the user's input prompt.
+
+== Architecture Enum Values
+
+[cols="1,2"]
+|===
+| Value | Architecture
+
+| `REACT` | ReAct (Reason + Act)
+| `PLAN_AND_EXECUTE` | Plan-and-Execute
+| `REFLECTION` | Reflection
+| `STATE_GRAPH` | State Graph
+| `SUPERVISOR` | Supervisor
+| `HIERARCHICAL` | Hierarchical
+| `CREW` | Role-Based Crew
+| `SWARM` | Conversational Swarm
+| `PIPELINE` | DAG Pipeline
+| `HANDOFF` | Handoff
+| `MAP_REDUCE` | Map-Reduce
+| `DEBATE` | Debate-Consensus
+| `TOOL_USE` | Tool-Use Agent
+| `VERIFICATION` | Verification Loop
+|===
+
+== LlmProvider Enum Values
+
+[cols="1,2,1"]
+|===
+| Value | Default Base URL | Compatible
+
+| `OPENAI` | `https://api.openai.com` | OpenAI ✅
+| `OLLAMA` | `http://localhost:11434` | OpenAI ✅
+| `DEEPSEEK` | `https://api.deepseek.com` | OpenAI ✅
+| `MISTRAL` | `https://api.mistral.ai` | OpenAI ✅
+| `GROQ` | `https://api.groq.com/openai` | OpenAI ✅
+| `TOGETHER` | `https://api.together.xyz` | OpenAI ✅
+| `FIREWORKS` | `https://api.fireworks.ai/inference` | OpenAI ✅
+| `PERPLEXITY` | `https://api.perplexity.ai` | OpenAI ✅
+| `DEEPINFRA` | `https://api.deepinfra.com` | OpenAI ✅
+| `OPENROUTER` | `https://openrouter.ai/api` | OpenAI ✅
+| `VLLM` | `http://localhost:8000` | OpenAI ✅
+| `LM_STUDIO` | `http://localhost:1234` | OpenAI ✅
+| `LOCAL_AI` | `http://localhost:8080` | OpenAI ✅
+| `HUGGING_FACE` | `https://api-inference.huggingface.co` | OpenAI ✅
+| `REPLICATE` | `https://openai-proxy.replicate.com` | OpenAI ✅
+| `SAMBANOVA` | `https://api.sambanova.ai` | OpenAI ✅
+| `CEREBRAS` | `https://api.cerebras.ai` | OpenAI ✅
+| `ANYSCALE` | `https://api.endpoints.anyscale.com` | OpenAI ✅
+| `ANTHROPIC` | `https://api.anthropic.com` | Dedicated
+| `GOOGLE` | `https://generativelanguage.googleapis.com` | Dedicated
+| `COHERE` | `https://api.cohere.com` | Dedicated
+|===
+
+== InferenceQuality Enum
+
+[cols="1,3"]
+|===
+| Value | Description
+
+| `HIGH` | Most capable model (Claude Opus, GPT-4o)
+| `MEDIUM` | Balanced cost/quality (default)
+| `LOW` | Fast and cheap (Groq, tinyllama)
+|===

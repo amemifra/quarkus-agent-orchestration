@@ -1,0 +1,19 @@
+name: "Quarkus Agent Orchestration"
+description: "Enterprise-grade Quarkus extension exposing 14 AI agent architectures as methods of a single CDI injectable service, with 21 LLM providers and quality-tier routing."
+metadata:
+  keywords:
+    - "agent"
+    - "ai"
+    - "orchestration"
+    - "multi-agent"
+    - "react"
+    - "langgraph"
+    - "crewai"
+    - "llm"
+    - "openai"
+    - "ollama"
+    - "anthropic"
+  categories:
+    - "AI"
+  status: "preview"
+  guide: "https://quarkiverse.github.io/quarkiverse-docs/quarkus-agent-orchestration/dev/index.html"
