@@ -24,9 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The single CDI injectable service that exposes ALL 14 AI agent orchestration architectures.
+ * The single CDI injectable service that exposes ALL 14 AI agent orchestration
+ * architectures.
+ * 
  * <pre>
- * &#64;Inject AgentOrchestrationService agents;
+ * &#64;Inject
+ * AgentOrchestrationService agents;
  * agents.react(config, "What is 2+2?");
  * agents.crew(config, crewMembers, "Write a report");
  * </pre>
@@ -34,25 +37,70 @@ import java.util.Map;
 @ApplicationScoped
 public class AgentOrchestrationService {
 
-    @Inject LlmClient llmClient;
+    @Inject
+    LlmClient llmClient;
 
     // ── All 14 Architecture Engines (CDI-injected) ──
-    @Inject ToolUseEngine toolUseEngine;
-    @Inject ReActEngine reActEngine;
-    @Inject ReflectionEngine reflectionEngine;
-    @Inject VerificationEngine verificationEngine;
-    @Inject PipelineEngine pipelineEngine;
-    @Inject PlanExecuteEngine planExecuteEngine;
-    @Inject SupervisorEngine supervisorEngine;
-    @Inject MapReduceEngine mapReduceEngine;
-    @Inject DebateEngine debateEngine;
-    @Inject StateGraphEngine stateGraphEngine;
-    @Inject HierarchicalEngine hierarchicalEngine;
-    @Inject CrewEngine crewEngine;
-    @Inject SwarmEngine swarmEngine;
-    @Inject HandoffEngine handoffEngine;
+    @Inject
+    ToolUseEngine toolUseEngine;
+    @Inject
+    ReActEngine reActEngine;
+    @Inject
+    ReflectionEngine reflectionEngine;
+    @Inject
+    VerificationEngine verificationEngine;
+    @Inject
+    PipelineEngine pipelineEngine;
+    @Inject
+    PlanExecuteEngine planExecuteEngine;
+    @Inject
+    SupervisorEngine supervisorEngine;
+    @Inject
+    MapReduceEngine mapReduceEngine;
+    @Inject
+    DebateEngine debateEngine;
+    @Inject
+    StateGraphEngine stateGraphEngine;
+    @Inject
+    HierarchicalEngine hierarchicalEngine;
+    @Inject
+    CrewEngine crewEngine;
+    @Inject
+    SwarmEngine swarmEngine;
+    @Inject
+    HandoffEngine handoffEngine;
 
-    public String version() { return "1.0.0-SNAPSHOT"; }
+    public String version() {
+        return "1.0.0-SNAPSHOT";
+    }
+
+    // ── Declarative Agents (Roadmap T7) ──
+    public io.quarkiverse.agent.runtime.declarative.DeclarativeAgentConfig loadDeclarative(String classpathResource) {
+        try {
+            return io.quarkiverse.agent.runtime.declarative.DeclarativeAgentParser.parseClasspath(classpathResource);
+        } catch (java.io.IOException e) {
+            throw new RuntimeException("Failed to load declarative agent from: " + classpathResource, e);
+        }
+    }
+
+    public AgentResult executeDeclarative(AgentConfig config, String classpathResource, String prompt) {
+        io.quarkiverse.agent.runtime.declarative.DeclarativeAgentConfig dec = loadDeclarative(classpathResource);
+        // Map declarative config to execution. Using "TOOL_USE" as default fallback for
+        // single agents.
+        if (dec.type == null || dec.type.equalsIgnoreCase("TOOL_USE") || dec.type.equalsIgnoreCase("TOOL")) {
+            // For now, override system prompt if defined in declarative file
+            if (dec.systemPrompt != null && !dec.systemPrompt.isBlank()) {
+                config = AgentConfig.builder(config).systemPrompt(dec.systemPrompt).build();
+            }
+            return toolUseEngine.execute(config, prompt, llmClient);
+        } else if (dec.type.equalsIgnoreCase("REACT")) {
+            if (dec.systemPrompt != null && !dec.systemPrompt.isBlank()) {
+                config = AgentConfig.builder(config).systemPrompt(dec.systemPrompt).build();
+            }
+            return reActEngine.execute(config, prompt, llmClient);
+        }
+        throw new UnsupportedOperationException("Execution not yet fully mapped for declarative type: " + dec.type);
+    }
 
     // ── A13: Tool-Use Agent ──
     public AgentResult toolUse(AgentConfig config, String prompt) {
@@ -121,7 +169,7 @@ public class AgentOrchestrationService {
 
     // ── A10: Handoff ──
     public AgentResult handoff(AgentConfig config, Map<String, HandoffEngine.HandoffAgent> agents,
-                               String startAgent, String prompt) {
+            String startAgent, String prompt) {
         return handoffEngine.execute(config, agents, startAgent, prompt, llmClient);
     }
 }

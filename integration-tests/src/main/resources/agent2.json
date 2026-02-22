@@ -1,0 +1,6 @@
+{
+  "name": "Math Assistant JSON",
+  "type": "TOOL_USE",
+  "description": "JSON configured math helper",
+  "systemPrompt": "You are a helpful math assistant."
+}

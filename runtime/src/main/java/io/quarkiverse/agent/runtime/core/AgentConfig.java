@@ -18,7 +18,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Configuration for an agent execution. Builder pattern for fluent construction.
+ * Configuration for an agent execution. Builder pattern for fluent
+ * construction.
  */
 public class AgentConfig {
 
@@ -28,15 +29,44 @@ public class AgentConfig {
     private int maxIterations = 10;
     private final List<Tool> tools = new ArrayList<>();
 
-    private AgentConfig() {}
+    private AgentConfig() {
+    }
 
-    public String model() { return model; }
-    public String systemPrompt() { return systemPrompt; }
-    public double temperature() { return temperature; }
-    public int maxIterations() { return maxIterations; }
-    public List<Tool> tools() { return Collections.unmodifiableList(tools); }
+    public String model() {
+        return model;
+    }
 
-    public static Builder builder() { return new Builder(); }
+    public String systemPrompt() {
+        return systemPrompt;
+    }
+
+    public double temperature() {
+        return temperature;
+    }
+
+    public int maxIterations() {
+        return maxIterations;
+    }
+
+    public List<Tool> tools() {
+        return Collections.unmodifiableList(tools);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static Builder builder(AgentConfig existing) {
+        Builder b = new Builder()
+                .model(existing.model())
+                .systemPrompt(existing.systemPrompt())
+                .temperature(existing.temperature())
+                .maxIterations(existing.maxIterations());
+        for (Tool t : existing.tools()) {
+            b.addTool(t);
+        }
+        return b;
+    }
 
     public static class Builder {
         private final AgentConfig config = new AgentConfig();
